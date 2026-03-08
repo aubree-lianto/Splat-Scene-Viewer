@@ -44,7 +44,7 @@ function updateFPS() {
   const currentTime = performance.now();
   const delta = currentTime - lastTime;
 
-  if (delta >= 1000) {
+  if (delta >= 100) {
     fps = Math.round((frameCount * 1000) / delta);
     frameCount = 0;
     lastTime = currentTime;
