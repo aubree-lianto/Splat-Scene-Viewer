@@ -282,13 +282,17 @@ document.addEventListener('keydown', (e) => {
 // Mouse look — only fires while pointer is locked
 document.addEventListener('mousemove', (e) => {
   if (!walkMode || !document.pointerLockElement) return;
-  yaw   -= e.movementX * mouseSensitivity;
-  pitch -= e.movementY * mouseSensitivity;
+  yaw   += e.movementX * mouseSensitivity;
+  pitch += e.movementY * mouseSensitivity;
   // Clamp pitch so camera can't flip upside down
   pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
-  // Apply rotation only when mouse moves
+
+  // Rotate camera in place around its own position
+  // Move target to be 1 unit in front of camera after rotation
   const euler = new THREE.Euler(pitch, yaw, 0, 'YXZ');
+  const direction = new THREE.Vector3(0, 0, -1).applyEuler(euler);
   viewer.camera.quaternion.setFromEuler(euler);
+  viewer.perspectiveControls.target.copy(viewer.camera.position).addScaledVector(direction, 1);
 });
 
 // Exit walk mode if pointer lock is released (e.g. user presses Escape)
