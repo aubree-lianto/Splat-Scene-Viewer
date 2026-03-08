@@ -1,4 +1,5 @@
 import * as GaussianSplats3D from '@mkkellogg/gaussian-splats-3d';
+import * as THREE from 'three';
 
 console.log('Initializing Gaussian Splats Viewer...');
 
@@ -6,7 +7,7 @@ console.log('Initializing Gaussian Splats Viewer...');
 // initialCameraPosition: camera's starting position in the 3D space
 // initalCameraLookAt: point at which the camera focuses on initially 
 const viewer = new GaussianSplats3D.Viewer({
-  cameraUp: [0, -1, -0.6],
+  cameraUp: [0, -1, 0],
   initialCameraPosition: [-1, -4, 6],
   initialCameraLookAt: [0, 4, 0],
 });
@@ -21,14 +22,24 @@ const pointCountDisplay = document.getElementById('point-count');
 const gaussianCountDisplay = document.getElementById('gaussian-count');
 const frameSceneBtn = document.getElementById('frame-scene-btn');
 const resetViewBtn = document.getElementById('reset-view-btn');
+const walkModeBtn = document.getElementById('walk-mode-btn');
+const crosshair = document.getElementById('crosshair');
 
 // Store initial camera configuration
 // TODO: figure out whats different between initalCameraState and what this talks to
 const initialCameraState = {
   position: [-1, -4, 6],
   lookAt: [0, 4, 0],
-  up: [0, -1, -0.6]
+  up: [0, -1, 0]
 };
+
+// Walk mode state
+let walkMode = false;
+const keys = {};
+const walkSpeed = 0.05; // units per frame
+const mouseSensitivity = 0.002;
+let yaw = 0;   // horizontal rotation (radians)
+let pitch = 0; // vertical rotation (radians)
 
 
 // FPS Counter
@@ -38,7 +49,40 @@ let fps = 0;
 let frameCount = 0;
 let lastTime = performance.now();
 
+function updateWalk() {
+  if (!walkMode) return;
+
+  console.log('Walk mode active, keys:', keys);
+
+  // Get the direction the camera is actually looking
+  const forward = new THREE.Vector3();
+  viewer.camera.getWorldDirection(forward);
+
+  // Right is perpendicular to forward and world up
+  // Use fixed Y-up instead of camera.up (which is flipped to -Y in this scene)
+  const worldUp = new THREE.Vector3(0, 1, 0); // Define world "up" direction
+  const right = new THREE.Vector3().crossVectors(forward, worldUp).normalize();
+
+  console.log('Forward:', forward);
+  console.log('Right:', right); 
+
+  const move = new THREE.Vector3();
+  if (keys['KeyW']) { move.addScaledVector(forward, walkSpeed); console.log('W pressed'); }
+  if (keys['KeyS']) { move.addScaledVector(forward, -walkSpeed); console.log('S pressed'); }
+  if (keys['KeyA']) { move.addScaledVector(right, walkSpeed); console.log('A pressed - moving by:', move); }
+  if (keys['KeyD']) { move.addScaledVector(right, -walkSpeed); console.log('D pressed - moving by:', move); }
+
+  viewer.camera.position.add(move);
+
+  // Keep the orbit target synced to camera position so the library's
+  // internal controls.update() doesn't pull the camera back to the old target
+  if (move.lengthSq() > 0) {
+    viewer.perspectiveControls.target.add(move);
+  }
+}
+
 function updateFPS() {
+  updateWalk();
   frameCount++;
   const currentTime = performance.now();
   const delta = currentTime - lastTime;
@@ -192,6 +236,66 @@ function resetView() {
   }
 }
 
+// Walk mode toggle
+function toggleWalkMode() {
+  walkMode = !walkMode;
+
+  if (walkMode) {
+    // Initialize yaw/pitch from the camera's current orientation
+    // so mouse look starts from wherever the camera is pointing
+    const euler = new THREE.Euler().setFromQuaternion(viewer.camera.quaternion, 'YXZ');
+    yaw = euler.y;
+    pitch = euler.x;
+
+    // Disable orbit controls so they don't fight the walk camera
+    viewer.perspectiveControls.enabled = false;
+    // Request pointer lock so mouse movement is captured
+    document.body.requestPointerLock();
+    walkModeBtn.textContent = 'Orbit Mode';
+    crosshair.classList.add('show');
+    console.log('Walk mode enabled');
+  } else {
+    // Re-enable orbit controls
+    viewer.perspectiveControls.enabled = true;
+    document.exitPointerLock();
+    walkModeBtn.textContent = 'Walk Mode';
+    crosshair.classList.remove('show');
+    console.log('Walk mode disabled');
+  }
+}
+
+// Track held keys for WASD movement
+document.addEventListener('keydown', (e) => {
+  // Prevent orbit controls from handling WASD when in walk mode
+  if (walkMode && ['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) {
+    e.preventDefault();
+  }
+  keys[e.code] = true;
+});
+document.addEventListener('keyup',   (e) => { keys[e.code] = false; });
+
+// Tab key toggles walk mode
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Tab') { e.preventDefault(); toggleWalkMode(); }
+});
+
+// Mouse look — only fires while pointer is locked
+document.addEventListener('mousemove', (e) => {
+  if (!walkMode || !document.pointerLockElement) return;
+  yaw   -= e.movementX * mouseSensitivity;
+  pitch -= e.movementY * mouseSensitivity;
+  // Clamp pitch so camera can't flip upside down
+  pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
+  // Apply rotation only when mouse moves
+  const euler = new THREE.Euler(pitch, yaw, 0, 'YXZ');
+  viewer.camera.quaternion.setFromEuler(euler);
+});
+
+// Exit walk mode if pointer lock is released (e.g. user presses Escape)
+document.addEventListener('pointerlockchange', () => {
+  if (!document.pointerLockElement && walkMode) toggleWalkMode();
+});
+
 // Button event listeners
 if (frameSceneBtn){
   frameSceneBtn.addEventListener('click', frameScene);
@@ -204,6 +308,12 @@ if (resetViewBtn){
   console.log('Reset View Button listener attached');
 } else {
   console.error('resetViewBtn element not found')
+}
+if (walkModeBtn) {
+  walkModeBtn.addEventListener('click', toggleWalkMode);
+  console.log('Walk Mode Button listener attached');
+} else {
+  console.error('walkModeBtn element not found');
 }
 
 // Load a .ply or .splat file via URL 

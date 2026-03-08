@@ -49,6 +49,25 @@ h1 {
   transition: filter 300ms;
 }
 
+/* Crosshair (walk mode) */
+.crosshair {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 24px;
+  font-family: monospace;
+  pointer-events: none;
+  z-index: 1000;
+  display: none;
+  user-select: none;
+}
+
+.crosshair.show {
+  display: block;
+}
+
 /* Loading Progress Bar */
 .loading-container {
   position: fixed;
