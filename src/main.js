@@ -85,19 +85,17 @@ async function loadSplat(url) {
     // Calculate how long loading took 
     const loadTime = ((performance.now() - startTime) / 1000).toFixed(2);
     console.log(`Splat loaded successfully in ${loadTime}s`);
-    console.log('Scene object:', currentScene);
-
-    // Extract statistics from loaded scene (point count, gaussian count)
-    updateSceneStats();
-
-    // Start viewer and log
+    // Start viewer
     viewer.start();
     console.log('Viewer started');
+
+    // Extract statistics after short delay so splatMesh is fully initialized
+    setTimeout(updateSceneStats, 500);
 
   } catch (error) {
 
     // Log detailed info for debugging
-    console.error('✗ Failed to load splat scene:', error);
+    console.error('Failed to load splat scene:', error);
     console.error('Error details:', {
       message: error.message,
       stack: error.stack,
@@ -119,34 +117,13 @@ async function loadSplat(url) {
 // Extract and display scene metadata
 // Retrives scene bounding box, gaussian count, and point count
 function updateSceneStats() {
-  if (!currentScene) return;
+  if (!viewer.splatMesh) return;
 
-  // Get scene bounds 
-  if (currentScene.getSceneBounds) {
-    const bounds = currentScene.getSceneBounds();
-    console.log('Scene bounds:', bounds);
-  }
-
-  // Extract splat/gaussian count from scene mesgh
-  if (currentScene.splatMesh) {
-    const splatMesh = currentScene.splatMesh;
-    
-    // Get splat count (varies by library version)
-    let gaussianCount = 0;
-
-    // Method 1: check for direct splatCount property
-    if (splatMesh.splatCount !== undefined) {
-      gaussianCount = splatMesh.splatCount;
-
-    // Method 2: Sum splats across multiple objects
-    } else if (splatMesh.splats && splatMesh.splats.length) {
-      gaussianCount = splatMesh.splats.reduce((sum, s) => sum + (s.splats ? s.splats.length : 0), 0);
-    }
-    
-    // Update UI display with formatted numbers
-    gaussianCountDisplay.textContent = `Gaussians: ${gaussianCount.toLocaleString()}`;
-    pointCountDisplay.textContent = `Points: ${gaussianCount.toLocaleString()}`;
-  }
+  // Extract splat/gaussian count using library's getSplatCount method
+  const gaussianCount = viewer.splatMesh.getSplatCount();
+  console.log(`Loaded ${gaussianCount.toLocaleString()} gaussians`);
+  gaussianCountDisplay.textContent = `Gaussians: ${gaussianCount.toLocaleString()}`;
+  pointCountDisplay.textContent = `Points: ${gaussianCount.toLocaleString()}`;
 }
 
 // Frame Scene - fit camera to scene bounds
