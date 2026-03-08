@@ -30,11 +30,10 @@ const initialCameraState = {
   up: [0, -1, -0.6]
 };
 
-// Reference to currently loaded 3D scene
-let currentScene = null;
 
 // FPS Counter
-// TODO: ensure fps is calculated correctly; it is right now just a temporarily defined function
+// Continuously measure and display FPS to show rendering performance
+// The following function helps to identify performance bottlenecks
 let fps = 0;
 let frameCount = 0;
 let lastTime = performance.now();
@@ -77,7 +76,7 @@ async function loadSplat(url) {
     // Load Scene from URL/File
     // ShowLoadingUI: false as we choose not to use default loading screen provided in inital npm package
     // onProgresss: handle loading progress update
-    currentScene = await viewer.addSplatScene(url, { 
+    await viewer.addSplatScene(url, {
       showLoadingUI: false,
       onProgress: progressHandler
     });
@@ -127,9 +126,10 @@ function updateSceneStats() {
 }
 
 // Frame Scene - fit camera to scene bounds
-// TODO: Fix algorithm description
+// Uses library's computeBoundingBox() which returns real world-space positions
+// (geometry.computeBoundingBox() returns UV/attribute space coords, not world coords)
 function frameScene() {
-  if (!currentScene) {
+  if (!viewer.splatMesh) {
     console.warn('No scene loaded');
     return;
   }
@@ -137,45 +137,41 @@ function frameScene() {
   console.log('Framing scene...');
 
   try {
-    if (currentScene.getSceneBounds) {
-
-      // Get 3D bounding box of the scene
-      const bounds = currentScene.getSceneBounds();
-
-      // Calculate center point of bounding box
-      const center = [
-        (bounds.min[0] + bounds.max[0]) / 2,
-        (bounds.min[1] + bounds.max[1]) / 2,
-        (bounds.min[2] + bounds.max[2]) / 2
-      ];
-
-      // Find largest dimension (ensures we frame the entire model)
-      const size = Math.max(
-        bounds.max[0] - bounds.min[0], // Width
-        bounds.max[1] - bounds.min[1], // Height
-        bounds.max[2] - bounds.min[2]  // Depth
-      );
-
-      // Calculate camera distance needed to view entire model
-      // Formula: distance = size / tan(FOV/2)
-      const distance = size / Math.tan(Math.PI / 8); 
-
-      // Move camera to the calculated position  
-      viewer.setCamera({
-        position: [
-          center[0] - distance * 0.5,
-          center[1] - distance * 0.5,
-          center[2] + distance
-        ],
-        lookAt: center, // Look at model center
-        up: initialCameraState.up // Maintain consistent "up" direction
-      });
-
-      // Log framed scene 
-      console.log('Scene framed');
-    } else {
+    // computeBoundingBox(true) applies scene transforms → real world-space THREE.Box3
+    const bbox = viewer.splatMesh.computeBoundingBox(true);
+    if (!bbox) {
       console.warn('Scene bounds not available');
+      return;
     }
+
+    // bbox.min/max are Three.js Vector3 objects
+    const center = [
+      (bbox.min.x + bbox.max.x) / 2,
+      (bbox.min.y + bbox.max.y) / 2,
+      (bbox.min.z + bbox.max.z) / 2
+    ];
+
+    // Find largest dimension (ensures we frame the entire model)
+    const size = Math.max(
+      bbox.max.x - bbox.min.x, // Width
+      bbox.max.y - bbox.min.y, // Height
+      bbox.max.z - bbox.min.z  // Depth
+    );
+
+    // Calculate camera distance needed to view entire model
+    // Formula: distance = size / tan(FOV/2)
+    const distance = size / Math.tan(Math.PI / 8);
+
+    // perspectiveControls is always available; viewer.controls can be null before render loop
+    viewer.perspectiveControls.target.set(center[0], center[1], center[2]);
+    viewer.camera.position.set(
+      center[0] - distance * 0.5,
+      center[1] - distance * 0.5,
+      center[2] + distance
+    );
+    viewer.perspectiveControls.update();
+
+    console.log('Scene framed');
   } catch (error) {
     console.error('Error framing scene:', error);
   }
@@ -186,12 +182,10 @@ function resetView() {
   console.log('Resetting view...');
 
   try {
-    // Restore inital camera configuration
-    viewer.setCamera({
-      position: initialCameraState.position,
-      lookAt: initialCameraState.lookAt,
-      up: initialCameraState.up
-    });
+    // Restore initial camera configuration via controls so orbit stays in sync
+    viewer.perspectiveControls.target.set(...initialCameraState.lookAt);
+    viewer.camera.position.set(...initialCameraState.position);
+    viewer.perspectiveControls.update();
     console.log('View reset');
   } catch (error) {
     console.error('Error resetting view:', error);
@@ -199,8 +193,18 @@ function resetView() {
 }
 
 // Button event listeners
-frameSceneBtn.addEventListener('click', frameScene);
-resetViewBtn.addEventListener('click', resetView);
+if (frameSceneBtn){
+  frameSceneBtn.addEventListener('click', frameScene);
+  console.log('Frame Scene Button listener attached');
+} else {
+  console.error('frameSceneBtn element not found')
+}
+if (resetViewBtn){
+  resetViewBtn.addEventListener('click', resetView);
+  console.log('Reset View Button listener attached');
+} else {
+  console.error('resetViewBtn element not found')
+}
 
 // Load a .ply or .splat file via URL 
 const splatUrl = 'https://huggingface.co/datasets/dylanebert/3dgs/resolve/main/bonsai/bonsai-7k.splat';
