@@ -39,7 +39,7 @@ export class VideoExporter {
       const renderer = this.viewer.renderer;
       const originalSize = new THREE.Vector2();
       renderer.getSize(originalSize);
-      renderer.setSize(this.width, this.height);
+      renderer.setSize(this.width, this.height, false);
 
       // pendingPost lets us overlap the network POST for frame N with the
       // depth sort for frame N+1, so they run in parallel instead of serially
@@ -75,7 +75,7 @@ export class VideoExporter {
       if (pendingPost) await pendingPost;
 
       // Restore original canvas size
-      renderer.setSize(originalSize.x, originalSize.y);
+      renderer.setSize(originalSize.x, originalSize.y, false);
 
       // Tell server to run FFmpeg
       this.onProgress(1, 'Encoding video...');

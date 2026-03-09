@@ -20,7 +20,7 @@ export class CameraPath {
     const curve = new THREE.CatmullRomCurve3(
       this.keyframes.map(kf => kf.position),
       false,       // not a closed loop
-      'centripetal',   // spaces interpolation by actual distance — smooth without overshoot
+      'centripetal',  
       0.5          // tension (default, ignored by chordal but required by API)
     );
     return curve.getPoint(eased);
@@ -28,10 +28,9 @@ export class CameraPath {
 
   // Slerp rotation at normalized time t [0, 1]
   getRotationAt(t) {
-    const eased = this._ease(t);
-    const segment = eased * (this.keyframes.length - 1);
+    const segment = t * (this.keyframes.length - 1);
     const i = Math.min(Math.floor(segment), this.keyframes.length - 2);
-    const localT = segment - i;
+    const localT = this._ease(segment - i);
     const q = new THREE.Quaternion();
     q.slerpQuaternions(this.keyframes[i].quaternion, this.keyframes[i + 1].quaternion, localT);
     return q;
@@ -39,10 +38,9 @@ export class CameraPath {
 
   // Linear FOV interpolation at normalized time t [0, 1]
   getFovAt(t) {
-    const eased = this._ease(t);
-    const segment = eased * (this.keyframes.length - 1);
+    const segment = t * (this.keyframes.length - 1);
     const i = Math.min(Math.floor(segment), this.keyframes.length - 2);
-    const localT = segment - i;
+    const localT = this._ease(segment - i);
     return THREE.MathUtils.lerp(this.keyframes[i].fov, this.keyframes[i + 1].fov, localT);
   }
 }

@@ -420,14 +420,15 @@ document.addEventListener('keydown', (e) => {
 });
 document.addEventListener('keyup',   (e) => { keys[e.code] = false; });
 
-// Tab key toggles walk mode
+// Tab key toggles walk mode; block C key so the library's mesh cursor stays off
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Tab') { e.preventDefault(); toggleWalkMode(); }
+  if (e.code === 'KeyC') { e.stopImmediatePropagation(); }
 });
 
 // Mouse look — only fires while pointer is locked
 document.addEventListener('mousemove', (e) => {
-  if (!walkMode) return;
+  if (!walkMode || !document.pointerLockElement) return;
   yaw   += e.movementX * mouseSensitivity;
   pitch += e.movementY * mouseSensitivity;
   // Clamp pitch so camera can't flip upside down
