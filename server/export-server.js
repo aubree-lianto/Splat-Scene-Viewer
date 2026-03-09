@@ -34,12 +34,14 @@ app.post('/api/export/start', (req, res) => {
   res.json({ success: true });
 });
 
-// Receive a single frame as base64 PNG and save to disk
+// Receive a single frame as base64 JPEG (or PNG) and save to disk
 app.post('/api/export/frame', (req, res) => {
   const { frameIndex, imageData } = req.body;
 
-  const base64Data = imageData.replace(/^data:image\/png;base64,/, '');
-  const filename = `frame_${String(frameIndex).padStart(6, '0')}.png`;
+  const isJpeg = imageData.startsWith('data:image/jpeg');
+  const base64Data = imageData.replace(/^data:image\/(jpeg|png);base64,/, '');
+  const ext = isJpeg ? 'jpg' : 'png';
+  const filename = `frame_${String(frameIndex).padStart(6, '0')}.${ext}`;
   const filepath = path.join(FRAMES_DIR, filename);
 
   fs.writeFileSync(filepath, base64Data, 'base64');
@@ -66,13 +68,12 @@ app.post('/api/export/encode', (req, res) => {
   const ffmpeg = spawn('C:\\ffmpeg\\bin\\ffmpeg.exe', [
     '-y',
     '-framerate', String(fps),
-    '-i', path.join(FRAMES_DIR, 'frame_%06d.png'),
+    '-i', path.join(FRAMES_DIR, 'frame_%06d.jpg'),
     '-c:v', 'libx264',
-    '-pix_fmt', 'yuv420p',   // broad player compatibility
+    '-pix_fmt', 'yuv420p',
     '-preset', 'medium',
-    '-crf', '17',            // higher quality (was 23) — reduces gradient banding
-    '-vf', 'noise=alls=2:allf=t', // subtle dither breaks up compression banding on smooth gradients
-    '-s', `${width}x${height}`,
+    '-crf', '17',
+    '-vf', `scale=${width}:${height},noise=alls=2:allf=t`,
     outputPath,
   ]);
 

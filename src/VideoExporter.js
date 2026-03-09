@@ -178,24 +178,23 @@ export class VideoExporter {
     const imageData = ctx.getImageData(0, 0, w, h);
     const data = imageData.data;
 
-    // Apply exposure and contrast to each pixel in linear-ish space
+    // Apply exposure and contrast only if values differ from neutral
     const exp = this.exposure;
     const con = this.contrast;
-    // Contrast pivot at 0.5 (standard formula)
-    const offset = 0.5 * (1 - con);
-
-    for (let i = 0; i < data.length; i += 4) {
-      for (let c = 0; c < 3; c++) {
-        let v = data[i + c] / 255;
-        v *= exp;                    // exposure
-        v = v * con + offset;        // contrast
-        data[i + c] = Math.max(0, Math.min(255, Math.round(v * 255)));
+    if (exp !== 1.0 || con !== 1.0) {
+      const offset = 0.5 * (1 - con);
+      for (let i = 0; i < data.length; i += 4) {
+        for (let c = 0; c < 3; c++) {
+          let v = data[i + c] / 255;
+          v = v * exp * con + offset;
+          data[i + c] = Math.max(0, Math.min(255, Math.round(v * 255)));
+        }
       }
-      // alpha unchanged
+      ctx.putImageData(imageData, 0, 0);
     }
 
-    ctx.putImageData(imageData, 0, 0);
-    return offscreen.toDataURL('image/png');
+    // JPEG is ~3-5x faster to encode than PNG and small enough for local transfer
+    return offscreen.toDataURL('image/jpeg', 0.92);
   }
 
   async _post(path, body) {
