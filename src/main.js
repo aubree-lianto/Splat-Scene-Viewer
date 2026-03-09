@@ -1,5 +1,7 @@
 import * as GaussianSplats3D from '@mkkellogg/gaussian-splats-3d';
 import * as THREE from 'three';
+import { CameraPath } from './CameraPath.js';
+import { VideoExporter } from './VideoExporter.js';
 
 console.log('Initializing Gaussian Splats Viewer...');
 
@@ -27,6 +29,11 @@ const crosshair = document.getElementById('crosshair');
 const addKeyframeBtn = document.getElementById('add-keyframe-btn');
 const previewPathBtn = document.getElementById('preview-path-btn');
 const clearPathBtn = document.getElementById('clear-path-btn');
+const exportBtn = document.getElementById('export-btn');
+const exportProgress = document.getElementById('export-progress');
+const exportBar = document.getElementById('export-bar');
+const exportText = document.getElementById('export-text');
+const cancelExportBtn = document.getElementById('cancel-export-btn');
 const keyframeList = document.getElementById('keyframe-list');
 const pathStatus = document.getElementById('path-status');
 
@@ -39,7 +46,8 @@ const initialCameraState = {
 };
 
 // Camera path state
-const keyframes = [];        // { position, quaternion, fov }
+const keyframes = [];        // { position, quaternion, fov, id }
+const cameraPath = new CameraPath(keyframes);
 let isPlaying = false;
 let playbackStartTime = null;
 const playbackDuration = 5;  // seconds for full path playback
@@ -106,6 +114,7 @@ function addKeyframe() {
   });
   updateKeyframeList();
   previewPathBtn.disabled = keyframes.length < 2;
+  exportBtn.disabled = keyframes.length < 2;
   pathStatus.textContent = `${keyframes.length} keyframe(s)`;
   console.log(`Keyframe ${keyframeCounter} added`);
 }
@@ -169,6 +178,7 @@ function updateKeyframeList() {
       keyframes.splice(i, 1);
       updateKeyframeList();
       previewPathBtn.disabled = keyframes.length < 2;
+      exportBtn.disabled = keyframes.length < 2;
       pathStatus.textContent = keyframes.length ? `${keyframes.length} keyframe(s)` : '';
     });
     keyframeList.appendChild(item);
@@ -191,25 +201,10 @@ function updatePlayback() {
     viewer.perspectiveControls.enabled = true;
   }
 
-  // Smoothstep ease-in/out: slow start, fast middle, slow end
-  const eased = t * t * (3 - 2 * t);
-
-  // Position: sample CatmullRom spline through all keyframe positions
-  const curve = new THREE.CatmullRomCurve3(keyframes.map(kf => kf.position));
-  viewer.camera.position.copy(curve.getPoint(eased));
-
-  // Rotation: slerp between adjacent keyframe quaternions
-  const segment = eased * (keyframes.length - 1);
-  const i = Math.min(Math.floor(segment), keyframes.length - 2);
-  const localT = segment - i;
-  viewer.camera.quaternion.slerpQuaternions(
-    keyframes[i].quaternion,
-    keyframes[i + 1].quaternion,
-    localT
-  );
-
-  // FOV: linear interpolation between adjacent keyframes
-  viewer.camera.fov = THREE.MathUtils.lerp(keyframes[i].fov, keyframes[i + 1].fov, localT);
+  // Delegate spline/slerp/fov math to CameraPath
+  viewer.camera.position.copy(cameraPath.getPositionAt(t));
+  viewer.camera.quaternion.copy(cameraPath.getRotationAt(t));
+  viewer.camera.fov = cameraPath.getFovAt(t);
   viewer.camera.updateProjectionMatrix();
 
   // Sync orbit target so library doesn't fight camera position
@@ -483,7 +478,31 @@ if (clearPathBtn) clearPathBtn.addEventListener('click', () => {
   keyframes.length = 0;
   updateKeyframeList();
   previewPathBtn.disabled = true;
+  exportBtn.disabled = true;
   pathStatus.textContent = '';
+});
+
+if (exportBtn) exportBtn.addEventListener('click', () => {
+  const exporter = new VideoExporter(viewer, cameraPath, {
+    duration: playbackDuration,
+    onProgress: (p, msg) => {
+      exportBar.style.width = `${p * 100}%`;
+      exportText.textContent = msg;
+    },
+    onComplete: () => {
+      exportProgress.style.display = 'none';
+      exportBar.style.width = '0%';
+    },
+    onError: (e) => {
+      exportProgress.style.display = 'none';
+      exportBar.style.width = '0%';
+      alert(`Export failed: ${e}`);
+    },
+  });
+  exportProgress.style.display = 'block';
+  exportBar.style.width = '0%';
+  cancelExportBtn.onclick = () => exporter.cancel();
+  exporter.export();
 });
 
 // Load a .ply or .splat file via URL 

@@ -6,10 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "cd server && npm install && node export-server.js",
+    "start": "concurrently \"npm run dev\" \"npm run server\""
   },
   "devDependencies": {
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "concurrently": "^8.2.0"
   },
   "dependencies": {
     "@mkkellogg/gaussian-splats-3d": "^0.4.7",

@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Export server generated files
+server/node_modules
+server/frames/
+server/output/
+package-lock.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
