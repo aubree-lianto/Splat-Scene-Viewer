@@ -13,9 +13,16 @@ export class CameraPath {
   }
 
   // CatmullRom spline position at normalized time t [0, 1]
+  // tension 0 = tighter curves that pass cleanly through each keyframe,
+  // higher tension = more overshoot between points
   getPositionAt(t) {
     const eased = this._ease(t);
-    const curve = new THREE.CatmullRomCurve3(this.keyframes.map(kf => kf.position));
+    const curve = new THREE.CatmullRomCurve3(
+      this.keyframes.map(kf => kf.position),
+      false,       // not a closed loop
+      'centripetal',   // spaces interpolation by actual distance — smooth without overshoot
+      0.5          // tension (default, ignored by chordal but required by API)
+    );
     return curve.getPoint(eased);
   }
 
