@@ -24,6 +24,11 @@ const frameSceneBtn = document.getElementById('frame-scene-btn');
 const resetViewBtn = document.getElementById('reset-view-btn');
 const walkModeBtn = document.getElementById('walk-mode-btn');
 const crosshair = document.getElementById('crosshair');
+const addKeyframeBtn = document.getElementById('add-keyframe-btn');
+const previewPathBtn = document.getElementById('preview-path-btn');
+const clearPathBtn = document.getElementById('clear-path-btn');
+const keyframeList = document.getElementById('keyframe-list');
+const pathStatus = document.getElementById('path-status');
 
 // Store initial camera configuration
 // TODO: figure out whats different between initalCameraState and what this talks to
@@ -32,6 +37,12 @@ const initialCameraState = {
   lookAt: [0, 4, 0],
   up: [0, -1, 0]
 };
+
+// Camera path state
+const keyframes = [];        // { position, quaternion, fov }
+let isPlaying = false;
+let playbackStartTime = null;
+const playbackDuration = 5;  // seconds for full path playback
 
 // Walk mode state
 let walkMode = false;
@@ -81,8 +92,155 @@ function updateWalk() {
   }
 }
 
+// Stable counter so each keyframe keeps its capture number after reordering
+let keyframeCounter = 0;
+
+// Camera path recording — captures current camera pose as a keyframe
+function addKeyframe() {
+  keyframeCounter++;
+  keyframes.push({
+    position: viewer.camera.position.clone(),
+    quaternion: viewer.camera.quaternion.clone(),
+    fov: viewer.camera.fov,
+    id: keyframeCounter,   // never changes, survives reorder
+  });
+  updateKeyframeList();
+  previewPathBtn.disabled = keyframes.length < 2;
+  pathStatus.textContent = `${keyframes.length} keyframe(s)`;
+  console.log(`Keyframe ${keyframeCounter} added`);
+}
+
+// Rebuild the keyframe list UI with drag-to-reorder and delete buttons
+let dragSrcIndex = null;
+
+function updateKeyframeList() {
+  keyframeList.innerHTML = '';
+  keyframes.forEach((kf, i) => {
+    const item = document.createElement('div');
+    item.className = 'keyframe-item';
+    item.draggable = true;
+    item.dataset.index = i;
+    // Show playback order (i+1) and original capture ID so user knows which is which
+    item.innerHTML = `
+      <span class="kf-drag-handle">⠿</span>
+      <span class="kf-order">${i + 1}.</span>
+      <span class="kf-label">KF ${kf.id}</span>
+      <button class="kf-delete-btn" data-index="${i}">✕</button>`;
+
+    item.addEventListener('dragstart', (e) => {
+      dragSrcIndex = i;
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => item.classList.add('dragging'), 0);
+    });
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      document.querySelectorAll('.keyframe-item').forEach(el => {
+        el.classList.remove('drag-over-top', 'drag-over-bottom');
+      });
+    });
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      document.querySelectorAll('.keyframe-item').forEach(el => {
+        el.classList.remove('drag-over-top', 'drag-over-bottom');
+      });
+      // Show drop line above or below based on cursor position within the item
+      const rect = item.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      item.classList.add(e.clientY < midY ? 'drag-over-top' : 'drag-over-bottom');
+    });
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (dragSrcIndex === null || dragSrcIndex === i) return;
+      const rect = item.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      const insertAfter = e.clientY >= midY;
+      const moved = keyframes.splice(dragSrcIndex, 1)[0];
+      // Recalculate target index after removal
+      let targetIndex = parseInt(item.dataset.index);
+      if (dragSrcIndex < targetIndex) targetIndex--;
+      keyframes.splice(insertAfter ? targetIndex + 1 : targetIndex, 0, moved);
+      dragSrcIndex = null;
+      updateKeyframeList();
+      pathStatus.textContent = `${keyframes.length} keyframe(s)`;
+    });
+
+    item.querySelector('.kf-delete-btn').addEventListener('click', () => {
+      keyframes.splice(i, 1);
+      updateKeyframeList();
+      previewPathBtn.disabled = keyframes.length < 2;
+      pathStatus.textContent = keyframes.length ? `${keyframes.length} keyframe(s)` : '';
+    });
+    keyframeList.appendChild(item);
+  });
+}
+
+// Smooth camera playback along recorded keyframe path
+// Uses CatmullRom spline for position, slerp for rotation, lerp for FOV
+function updatePlayback() {
+  if (!isPlaying) return;
+
+  const elapsed = (performance.now() - playbackStartTime) / 1000;
+  let t = elapsed / playbackDuration;
+
+  if (t >= 1) {
+    t = 1;
+    isPlaying = false;
+    previewPathBtn.textContent = 'Preview';
+    pathStatus.textContent = 'Playback complete';
+    viewer.perspectiveControls.enabled = true;
+  }
+
+  // Smoothstep ease-in/out: slow start, fast middle, slow end
+  const eased = t * t * (3 - 2 * t);
+
+  // Position: sample CatmullRom spline through all keyframe positions
+  const curve = new THREE.CatmullRomCurve3(keyframes.map(kf => kf.position));
+  viewer.camera.position.copy(curve.getPoint(eased));
+
+  // Rotation: slerp between adjacent keyframe quaternions
+  const segment = eased * (keyframes.length - 1);
+  const i = Math.min(Math.floor(segment), keyframes.length - 2);
+  const localT = segment - i;
+  viewer.camera.quaternion.slerpQuaternions(
+    keyframes[i].quaternion,
+    keyframes[i + 1].quaternion,
+    localT
+  );
+
+  // FOV: linear interpolation between adjacent keyframes
+  viewer.camera.fov = THREE.MathUtils.lerp(keyframes[i].fov, keyframes[i + 1].fov, localT);
+  viewer.camera.updateProjectionMatrix();
+
+  // Sync orbit target so library doesn't fight camera position
+  const forward = new THREE.Vector3();
+  viewer.camera.getWorldDirection(forward);
+  viewer.perspectiveControls.target.copy(viewer.camera.position).addScaledVector(forward, 1);
+}
+
+// Toggle playback on/off
+function startPreview() {
+  if (keyframes.length < 2) return;
+
+  if (isPlaying) {
+    isPlaying = false;
+    previewPathBtn.textContent = 'Preview';
+    pathStatus.textContent = 'Stopped';
+    viewer.perspectiveControls.enabled = true;
+    return;
+  }
+
+  if (walkMode) toggleWalkMode(); // exit walk mode if active
+  isPlaying = true;
+  playbackStartTime = performance.now();
+  previewPathBtn.textContent = 'Stop';
+  pathStatus.textContent = 'Playing...';
+  viewer.perspectiveControls.enabled = false;
+}
+
 function updateFPS() {
   updateWalk();
+  updatePlayback();
   frameCount++;
   const currentTime = performance.now();
   const delta = currentTime - lastTime;
@@ -319,6 +477,14 @@ if (walkModeBtn) {
 } else {
   console.error('walkModeBtn element not found');
 }
+if (addKeyframeBtn) addKeyframeBtn.addEventListener('click', addKeyframe);
+if (previewPathBtn) previewPathBtn.addEventListener('click', startPreview);
+if (clearPathBtn) clearPathBtn.addEventListener('click', () => {
+  keyframes.length = 0;
+  updateKeyframeList();
+  previewPathBtn.disabled = true;
+  pathStatus.textContent = '';
+});
 
 // Load a .ply or .splat file via URL 
 const splatUrl = 'https://huggingface.co/datasets/dylanebert/3dgs/resolve/main/bonsai/bonsai-7k.splat';
