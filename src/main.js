@@ -420,9 +420,10 @@ document.addEventListener('keydown', (e) => {
 });
 document.addEventListener('keyup',   (e) => { keys[e.code] = false; });
 
-// Tab key toggles walk mode; block C key so the library's mesh cursor stays off
+// Tab key toggles walk mode; K adds a keyframe; block C so the library's mesh cursor stays off
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Tab') { e.preventDefault(); toggleWalkMode(); }
+  if (e.code === 'KeyK') { e.preventDefault(); addKeyframe(); }
   if (e.code === 'KeyC') { e.stopImmediatePropagation(); }
 });
 
