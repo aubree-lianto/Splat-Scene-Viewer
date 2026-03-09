@@ -41,29 +41,38 @@ export class VideoExporter {
       renderer.getSize(originalSize);
       renderer.setSize(this.width, this.height);
 
+      // pendingPost lets us overlap the network POST for frame N with the
+      // depth sort for frame N+1, so they run in parallel instead of serially
+      let pendingPost = null;
+
       for (let i = 0; i < totalFrames; i++) {
         if (this.cancelled) throw new Error('Export cancelled');
 
-        // t goes from 0 to 1 across all frames
         const t = totalFrames > 1 ? i / (totalFrames - 1) : 0;
 
-        // Set camera pose for this frame
+        // Pose camera and kick off the depth sort for this frame
         this._poseCamera(t);
-
-        // Render the scene at export resolution using the library's full pipeline
-        // (threeScene pass + splatMesh pass + helpers) so gaussians appear in the frame
         this.viewer.forceRenderNextFrame();
         this.viewer.update();
-        this.viewer.render();
 
-        // Capture frame as base64 PNG
+        // While the sort worker is running, drain the previous frame's POST
+        if (pendingPost) await pendingPost;
+
+        // Now wait for this frame's depth sort to finish before rendering —
+        // skipping this causes rainbow ring artifacts on distant gaussians
+        if (this.viewer.sortPromise) await this.viewer.sortPromise;
+
+        this.viewer.render();
         const imageData = renderer.domElement.toDataURL('image/png');
 
-        // Send frame to server
-        await this._post('/api/export/frame', { frameIndex: i, imageData });
+        // Fire POST without awaiting so it overlaps with the next frame's sort
+        pendingPost = this._post('/api/export/frame', { frameIndex: i, imageData });
 
         this.onProgress((i + 1) / totalFrames, `Rendering frame ${i + 1} / ${totalFrames}`);
       }
+
+      // Drain the final frame's POST before moving on to encode
+      if (pendingPost) await pendingPost;
 
       // Restore original canvas size
       renderer.setSize(originalSize.x, originalSize.y);
