@@ -10,7 +10,7 @@ console.log('Initializing Gaussian Splats Viewer...');
 // initalCameraLookAt: point at which the camera focuses on initially 
 const viewer = new GaussianSplats3D.Viewer({
   cameraUp: [0, -1, 0],
-  initialCameraPosition: [-1, -4, 6],
+  initialCameraPosition: [2.51658, 0.13117, -10.78817],
   initialCameraLookAt: [0, 4, 0],
 });
 
@@ -45,7 +45,6 @@ const keyframeList = document.getElementById('keyframe-list');
 const pathStatus = document.getElementById('path-status');
 
 // Store initial camera configuration
-// TODO: figure out whats different between initalCameraState and what this talks to
 const initialCameraState = {
   position: [-1, -4, 6],
   lookAt: [0, 4, 0],
@@ -360,16 +359,16 @@ function frameScene() {
       bbox.max.z - bbox.min.z  // Depth
     );
 
-    // Calculate camera distance needed to view entire model
-    // Formula: distance = size / tan(FOV/2)
-    const distance = size / Math.tan(Math.PI / 8);
+    // Fit-sphere formula: distance = (size/2) / tan(fov/2), using actual camera FOV
+    const fovRad = THREE.MathUtils.degToRad(viewer.camera.fov);
+    const distance = (size / 2) / Math.tan(fovRad / 2);
 
-    // perspectiveControls is always available; viewer.controls can be null before render loop
+    // Place camera directly in front of center along +Z with 10% padding
     viewer.perspectiveControls.target.set(center[0], center[1], center[2]);
     viewer.camera.position.set(
-      center[0] - distance * 0.5,
-      center[1] - distance * 0.5,
-      center[2] + distance
+      center[0],
+      center[1],
+      center[2] + distance * 1.1
     );
     viewer.perspectiveControls.update();
 

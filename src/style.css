@@ -260,6 +260,17 @@ h1 {
   margin-bottom: 4px;
 }
 
+#cancel-export-btn {
+  border-color: rgba(255, 80, 80, 0.5);
+  color: rgba(255, 100, 100, 0.8);
+}
+
+#cancel-export-btn:hover {
+  background-color: rgba(255, 60, 60, 0.2);
+  border-color: #ff4444;
+  color: #ff6464;
+}
+
 /* Key press toast — reuses walk-hud style, floats above it */
 .key-badge {
   bottom: 120px;
