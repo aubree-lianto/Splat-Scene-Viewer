@@ -50,6 +50,31 @@
     <div class="path-controls">
       <div class="path-header">Camera Path</div>
       <div id="keyframe-list" class="keyframe-list"></div>
+      <!-- Render settings -->
+      <div class="path-settings">
+        <label class="path-setting-label">Duration
+          <input id="duration-input" type="number" value="5" min="1" max="60" step="1" class="path-setting-input">s
+        </label>
+        <label class="path-setting-label">FPS
+          <select id="fps-select" class="path-setting-input">
+            <option value="24">24</option>
+            <option value="30" selected>30</option>
+            <option value="60">60</option>
+          </select>
+        </label>
+        <label class="path-setting-label">Res
+          <select id="res-select" class="path-setting-input">
+            <option value="1280x720" selected>720p</option>
+            <option value="1920x1080">1080p</option>
+          </select>
+        </label>
+      </div>
+      <!-- Save / Load path -->
+      <div class="path-buttons" style="margin-bottom:4px;">
+        <button id="save-path-btn">Save Path</button>
+        <button id="load-path-btn">Load Path</button>
+        <input id="load-path-input" type="file" accept=".json" style="display:none;">
+      </div>
       <div class="path-buttons">
         <button id="add-keyframe-btn">Add Keyframe</button>
         <button id="preview-path-btn" disabled>Preview</button>

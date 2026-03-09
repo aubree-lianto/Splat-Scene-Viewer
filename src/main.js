@@ -43,6 +43,12 @@ const exportText = document.getElementById('export-text');
 const cancelExportBtn = document.getElementById('cancel-export-btn');
 const keyframeList = document.getElementById('keyframe-list');
 const pathStatus = document.getElementById('path-status');
+const savePathBtn = document.getElementById('save-path-btn');
+const loadPathBtn = document.getElementById('load-path-btn');
+const loadPathInput = document.getElementById('load-path-input');
+const durationInput = document.getElementById('duration-input');
+const fpsSelect = document.getElementById('fps-select');
+const resSelect = document.getElementById('res-select');
 
 // Store initial camera configuration
 const initialCameraState = {
@@ -56,7 +62,7 @@ const keyframes = [];        // { position, quaternion, fov, id }
 const cameraPath = new CameraPath(keyframes);
 let isPlaying = false;
 let playbackStartTime = null;
-const playbackDuration = 5;  // seconds for full path playback
+let playbackDuration = 5;  // seconds for full path playback
 
 // Walk mode state
 let walkMode = false;
@@ -516,8 +522,12 @@ if (clearPathBtn) clearPathBtn.addEventListener('click', () => {
 });
 
 if (exportBtn) exportBtn.addEventListener('click', () => {
+  const [resW, resH] = resSelect.value.split('x').map(Number);
   const exporter = new VideoExporter(viewer, cameraPath, {
     duration: playbackDuration,
+    fps: Number(fpsSelect.value),
+    width: resW,
+    height: resH,
     onProgress: (p, msg) => {
       exportBar.style.width = `${p * 100}%`;
       exportText.textContent = msg;
@@ -539,6 +549,68 @@ if (exportBtn) exportBtn.addEventListener('click', () => {
   exportBar.style.width = '0%';
   cancelExportBtn.onclick = () => exporter.cancel();
   exporter.export();
+});
+
+// Clamp duration input to valid range on change
+durationInput.addEventListener('change', () => {
+  playbackDuration = Math.max(1, Math.min(60, Number(durationInput.value) || 5));
+  durationInput.value = playbackDuration;
+});
+
+// Save path + render settings to path.json
+savePathBtn.addEventListener('click', () => {
+  const [w, h] = resSelect.value.split('x').map(Number);
+  const data = {
+    keyframes: keyframes.map(kf => ({
+      id: kf.id,
+      position: kf.position.toArray(),
+      quaternion: [kf.quaternion.x, kf.quaternion.y, kf.quaternion.z, kf.quaternion.w],
+      fov: kf.fov,
+    })),
+    duration: playbackDuration,
+    fps: Number(fpsSelect.value),
+    width: w,
+    height: h,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'path.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// Load path.json — restore keyframes + render settings
+loadPathBtn.addEventListener('click', () => loadPathInput.click());
+loadPathInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      keyframes.length = 0;
+      keyframeCounter = 0;
+      for (const kf of data.keyframes) {
+        keyframes.push({
+          id: kf.id,
+          position: new THREE.Vector3(...kf.position),
+          quaternion: new THREE.Quaternion(...kf.quaternion),
+          fov: kf.fov,
+        });
+        keyframeCounter = Math.max(keyframeCounter, kf.id);
+      }
+      if (data.duration) { playbackDuration = data.duration; durationInput.value = data.duration; }
+      if (data.fps)      { fpsSelect.value = String(data.fps); }
+      if (data.width && data.height) { resSelect.value = `${data.width}x${data.height}`; }
+      updateKeyframeList();
+      previewPathBtn.disabled = keyframes.length < 2;
+      exportBtn.disabled = keyframes.length < 2;
+      pathStatus.textContent = `Loaded ${keyframes.length} keyframe(s)`;
+    } catch { alert('Invalid path.json'); }
+    loadPathInput.value = '';
+  };
+  reader.readAsText(file);
 });
 
 // Load a .ply or .splat file via URL 

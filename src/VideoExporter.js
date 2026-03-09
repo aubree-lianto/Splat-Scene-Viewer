@@ -7,9 +7,9 @@ export class VideoExporter {
   constructor(viewer, cameraPath, options = {}) {
     this.viewer = viewer;
     this.cameraPath = cameraPath;
-    this.width = 1280;
-    this.height = 720;
-    this.fps = 30;
+    this.width    = options.width    || 1280;
+    this.height   = options.height   || 720;
+    this.fps      = options.fps      || 30;
     this.duration = options.duration || 5;
     this.serverUrl = 'http://localhost:3001';
     this.cancelled = false;
