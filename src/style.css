@@ -259,6 +259,21 @@ h1 {
   width: auto;
 }
 
+/* Color grading sliders */
+.path-color-slider {
+  flex: 1;
+  accent-color: #646cff;
+  min-width: 60px;
+}
+
+.path-color-val {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  min-width: 28px;
+  text-align: right;
+  font-family: monospace;
+}
+
 /* Export progress bar */
 .export-progress {
   margin-top: 8px;

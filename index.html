@@ -69,6 +69,17 @@
           </select>
         </label>
       </div>
+      <!-- Color grading -->
+      <div class="path-settings" style="flex-direction:column;gap:4px;">
+        <label class="path-setting-label" style="width:100%;">Exposure
+          <input id="exposure-slider" type="range" min="0.1" max="3" step="0.05" value="1" class="path-color-slider">
+          <span id="exposure-val" class="path-color-val">1.00</span>
+        </label>
+        <label class="path-setting-label" style="width:100%;">Contrast
+          <input id="contrast-slider" type="range" min="0.2" max="3" step="0.05" value="1" class="path-color-slider">
+          <span id="contrast-val" class="path-color-val">1.00</span>
+        </label>
+      </div>
       <!-- Save / Load path -->
       <div class="path-buttons" style="margin-bottom:4px;">
         <button id="save-path-btn">Save Path</button>

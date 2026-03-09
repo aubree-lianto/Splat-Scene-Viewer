@@ -49,6 +49,10 @@ const loadPathInput = document.getElementById('load-path-input');
 const durationInput = document.getElementById('duration-input');
 const fpsSelect = document.getElementById('fps-select');
 const resSelect = document.getElementById('res-select');
+const exposureSlider = document.getElementById('exposure-slider');
+const contrastSlider = document.getElementById('contrast-slider');
+const exposureVal = document.getElementById('exposure-val');
+const contrastVal = document.getElementById('contrast-val');
 
 // Store initial camera configuration
 const initialCameraState = {
@@ -551,6 +555,20 @@ if (exportBtn) exportBtn.addEventListener('click', () => {
   exporter.export();
 });
 
+// Color grading — all via CSS filter on the canvas so it works with the splat renderer
+// (the splat material sets toneMapped:false, bypassing THREE's tone mapping pipeline)
+function applyColorGrading() {
+  const exp = Number(exposureSlider.value);
+  const con = Number(contrastSlider.value);
+  viewer.renderer.domElement.style.filter = `brightness(${exp}) contrast(${con})`;
+  exposureVal.textContent = exp.toFixed(2);
+  contrastVal.textContent = con.toFixed(2);
+  viewer.forceRenderNextFrame();
+}
+
+exposureSlider.addEventListener('input', applyColorGrading);
+contrastSlider.addEventListener('input', applyColorGrading);
+
 // Clamp duration input to valid range on change
 durationInput.addEventListener('change', () => {
   playbackDuration = Math.max(1, Math.min(60, Number(durationInput.value) || 5));
@@ -571,6 +589,8 @@ savePathBtn.addEventListener('click', () => {
     fps: Number(fpsSelect.value),
     width: w,
     height: h,
+    exposure: Number(exposureSlider.value),
+    contrast: Number(contrastSlider.value),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -603,6 +623,9 @@ loadPathInput.addEventListener('change', (e) => {
       if (data.duration) { playbackDuration = data.duration; durationInput.value = data.duration; }
       if (data.fps)      { fpsSelect.value = String(data.fps); }
       if (data.width && data.height) { resSelect.value = `${data.width}x${data.height}`; }
+      if (data.exposure !== undefined) { exposureSlider.value = data.exposure; }
+      if (data.contrast !== undefined) { contrastSlider.value = data.contrast; }
+      applyColorGrading();
       updateKeyframeList();
       previewPathBtn.disabled = keyframes.length < 2;
       exportBtn.disabled = keyframes.length < 2;
