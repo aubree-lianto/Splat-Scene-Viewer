@@ -45,49 +45,56 @@ export class VideoExporter {
       // depth sort for frame N+1, so they run in parallel instead of serially
       let pendingPost = null;
 
-      for (let i = 0; i < totalFrames; i++) {
-        if (this.cancelled) throw new Error('Export cancelled');
+      try {
+        for (let i = 0; i < totalFrames; i++) {
+          if (this.cancelled) {
+            // Drain in-flight POST quietly before throwing
+            if (pendingPost) await pendingPost.catch(() => {});
+            throw new Error('Export cancelled');
+          }
 
-        const t = totalFrames > 1 ? i / (totalFrames - 1) : 0;
+          const t = totalFrames > 1 ? i / (totalFrames - 1) : 0;
 
-        // Pose camera and kick off the depth sort for this frame
-        this._poseCamera(t);
-        this.viewer.forceRenderNextFrame();
-        this.viewer.update();
+          // Pose camera and kick off the depth sort for this frame
+          this._poseCamera(t);
+          this.viewer.forceRenderNextFrame();
+          this.viewer.update();
 
-        // While the sort worker is running, drain the previous frame's POST
+          // While the sort worker is running, drain the previous frame's POST
+          if (pendingPost) await pendingPost;
+
+          // Now wait for this frame's depth sort to finish before rendering —
+          // skipping this causes rainbow ring artifacts on distant gaussians
+          if (this.viewer.sortPromise) await this.viewer.sortPromise;
+
+          this.viewer.render();
+          const imageData = renderer.domElement.toDataURL('image/png');
+
+          // Fire POST without awaiting so it overlaps with the next frame's sort
+          pendingPost = this._post('/api/export/frame', { frameIndex: i, imageData });
+
+          this.onProgress((i + 1) / totalFrames, `Rendering frame ${i + 1} / ${totalFrames}`);
+        }
+
+        // Drain the final frame's POST before moving on to encode
         if (pendingPost) await pendingPost;
 
-        // Now wait for this frame's depth sort to finish before rendering —
-        // skipping this causes rainbow ring artifacts on distant gaussians
-        if (this.viewer.sortPromise) await this.viewer.sortPromise;
+        // Tell server to run FFmpeg
+        this.onProgress(1, 'Encoding video...');
+        await this._post('/api/export/encode', {
+          fps: this.fps,
+          width: this.width,
+          height: this.height,
+        });
 
-        this.viewer.render();
-        const imageData = renderer.domElement.toDataURL('image/png');
+        // Trigger browser download
+        this._triggerDownload();
+        this.onComplete();
 
-        // Fire POST without awaiting so it overlaps with the next frame's sort
-        pendingPost = this._post('/api/export/frame', { frameIndex: i, imageData });
-
-        this.onProgress((i + 1) / totalFrames, `Rendering frame ${i + 1} / ${totalFrames}`);
+      } finally {
+        // Always restore renderer size — runs on success, error, and cancel
+        renderer.setSize(originalSize.x, originalSize.y, false);
       }
-
-      // Drain the final frame's POST before moving on to encode
-      if (pendingPost) await pendingPost;
-
-      // Restore original canvas size
-      renderer.setSize(originalSize.x, originalSize.y, false);
-
-      // Tell server to run FFmpeg
-      this.onProgress(1, 'Encoding video...');
-      await this._post('/api/export/encode', {
-        fps: this.fps,
-        width: this.width,
-        height: this.height,
-      });
-
-      // Trigger browser download
-      this._triggerDownload();
-      this.onComplete();
 
     } catch (err) {
       this.onError(err.message);

@@ -488,13 +488,16 @@ if (exportBtn) exportBtn.addEventListener('click', () => {
     onComplete: () => {
       exportProgress.style.display = 'none';
       exportBar.style.width = '0%';
+      exportBtn.disabled = false;
     },
     onError: (e) => {
       exportProgress.style.display = 'none';
       exportBar.style.width = '0%';
-      alert(`Export failed: ${e}`);
+      exportBtn.disabled = false;
+      if (e !== 'Export cancelled') alert(`Export failed: ${e}`);
     },
   });
+  exportBtn.disabled = true;
   exportProgress.style.display = 'block';
   exportBar.style.width = '0%';
   cancelExportBtn.onclick = () => exporter.cancel();
