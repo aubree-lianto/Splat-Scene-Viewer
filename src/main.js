@@ -29,6 +29,7 @@ const viewer = new GaussianSplats3D.Viewer({
   initialCameraPosition: [2.51658, 0.13117, -10.78817],
   initialCameraLookAt: [0, 4, 0],
   renderer,
+  rootElement: document.body,
 });
 
 // Cache the DOM elements for efficient access throughout application
@@ -73,7 +74,7 @@ const contrastVal = document.getElementById('contrast-val');
 
 // Store initial camera configuration
 const initialCameraState = {
-  position: [-1, -4, 6],
+  position: [2.51658, 0.13117, -10.78817],
   lookAt: [0, 4, 0],
   up: [0, -1, 0]
 };
