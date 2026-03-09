@@ -19,11 +19,7 @@ A web-based 3D Gaussian Splats viewer with interactive camera controls, animated
 ## Setup
 
 ```bash
-# Install frontend dependencies
 npm install
-
-# Install server dependencies
-cd server && npm install && cd ..
 ```
 
 ## Running
