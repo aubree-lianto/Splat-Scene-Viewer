@@ -70,7 +70,8 @@ app.post('/api/export/encode', (req, res) => {
     '-c:v', 'libx264',
     '-pix_fmt', 'yuv420p',   // broad player compatibility
     '-preset', 'medium',
-    '-crf', '23',            // quality: lower = better, 23 is default
+    '-crf', '17',            // higher quality (was 23) — reduces gradient banding
+    '-vf', 'noise=alls=2:allf=t', // subtle dither breaks up compression banding on smooth gradients
     '-s', `${width}x${height}`,
     outputPath,
   ]);

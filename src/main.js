@@ -8,10 +8,27 @@ console.log('Initializing Gaussian Splats Viewer...');
 // CameraUp: Y-axis orientation (defines which direction is "up")
 // initialCameraPosition: camera's starting position in the 3D space
 // initalCameraLookAt: point at which the camera focuses on initially 
+// preserveDrawingBuffer:true keeps canvas pixels stable after compositing,
+// which is required for correct export frame capture via drawImage/toDataURL.
+// Without it the WebGL spec allows the browser to clear the buffer immediately
+// after presenting, giving us corrupted (ring-artifact) frames on readback.
+const renderer = new THREE.WebGLRenderer({
+  antialias: false,
+  precision: 'highp',
+  preserveDrawingBuffer: true,
+});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.domElement.style.position = 'absolute';
+renderer.domElement.style.width = '100%';
+renderer.domElement.style.height = '100%';
+document.body.appendChild(renderer.domElement);
+
 const viewer = new GaussianSplats3D.Viewer({
   cameraUp: [0, -1, 0],
   initialCameraPosition: [2.51658, 0.13117, -10.78817],
   initialCameraLookAt: [0, 4, 0],
+  renderer,
 });
 
 // Cache the DOM elements for efficient access throughout application
@@ -532,6 +549,8 @@ if (exportBtn) exportBtn.addEventListener('click', () => {
     fps: Number(fpsSelect.value),
     width: resW,
     height: resH,
+    exposure: Number(exposureSlider.value),
+    contrast: Number(contrastSlider.value),
     onProgress: (p, msg) => {
       exportBar.style.width = `${p * 100}%`;
       exportText.textContent = msg;
