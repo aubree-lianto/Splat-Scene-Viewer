@@ -71,25 +71,20 @@ let lastTime = performance.now();
 function updateWalk() {
   if (!walkMode) return;
 
-  console.log('Walk mode active, keys:', keys);
-
   // Get the direction the camera is actually looking
   const forward = new THREE.Vector3();
   viewer.camera.getWorldDirection(forward);
 
   // Right is perpendicular to forward and world up
   // Use fixed Y-up instead of camera.up (which is flipped to -Y in this scene)
-  const worldUp = new THREE.Vector3(0, 1, 0); // Define world "up" direction
+  const worldUp = new THREE.Vector3(0, 1, 0);
   const right = new THREE.Vector3().crossVectors(forward, worldUp).normalize();
 
-  console.log('Forward:', forward);
-  console.log('Right:', right); 
-
   const move = new THREE.Vector3();
-  if (keys['KeyW']) { move.addScaledVector(forward, walkSpeed); console.log('W pressed'); }
-  if (keys['KeyS']) { move.addScaledVector(forward, -walkSpeed); console.log('S pressed'); }
-  if (keys['KeyA']) { move.addScaledVector(right, walkSpeed); console.log('A pressed - moving by:', move); }
-  if (keys['KeyD']) { move.addScaledVector(right, -walkSpeed); console.log('D pressed - moving by:', move); }
+  if (keys['KeyW']) move.addScaledVector(forward, walkSpeed);
+  if (keys['KeyS']) move.addScaledVector(forward, -walkSpeed);
+  if (keys['KeyA']) move.addScaledVector(right, walkSpeed);
+  if (keys['KeyD']) move.addScaledVector(right, -walkSpeed);
 
   viewer.camera.position.add(move);
 
@@ -406,14 +401,12 @@ function toggleWalkMode() {
     document.body.requestPointerLock();
     walkModeBtn.textContent = 'Orbit Mode';
     crosshair.classList.add('show');
-    console.log('Walk mode enabled');
   } else {
     // Re-enable orbit controls
     viewer.perspectiveControls.enabled = true;
     document.exitPointerLock();
     walkModeBtn.textContent = 'Walk Mode';
     crosshair.classList.remove('show');
-    console.log('Walk mode disabled');
   }
 }
 
@@ -434,7 +427,7 @@ document.addEventListener('keydown', (e) => {
 
 // Mouse look — only fires while pointer is locked
 document.addEventListener('mousemove', (e) => {
-  if (!walkMode || !document.pointerLockElement) return;
+  if (!walkMode) return;
   yaw   += e.movementX * mouseSensitivity;
   pitch += e.movementY * mouseSensitivity;
   // Clamp pitch so camera can't flip upside down
@@ -449,8 +442,13 @@ document.addEventListener('mousemove', (e) => {
 });
 
 // Exit walk mode if pointer lock is released (e.g. user presses Escape)
+// Small delay prevents brief lock drops (e.g. alt-tab) from killing walk mode
 document.addEventListener('pointerlockchange', () => {
-  if (!document.pointerLockElement && walkMode) toggleWalkMode();
+  if (!document.pointerLockElement && walkMode) {
+    setTimeout(() => {
+      if (!document.pointerLockElement && walkMode) toggleWalkMode();
+    }, 200);
+  }
 });
 
 // Button event listeners
@@ -468,9 +466,6 @@ if (resetViewBtn){
 }
 if (walkModeBtn) {
   walkModeBtn.addEventListener('click', toggleWalkMode);
-  console.log('Walk Mode Button listener attached');
-} else {
-  console.error('walkModeBtn element not found');
 }
 if (addKeyframeBtn) addKeyframeBtn.addEventListener('click', addKeyframe);
 if (previewPathBtn) previewPathBtn.addEventListener('click', startPreview);
