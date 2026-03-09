@@ -66,6 +66,7 @@ const walkSpeed = 0.05; // units per frame
 const mouseSensitivity = 0.002;
 let yaw = 0;   // horizontal rotation (radians)
 let pitch = 0; // vertical rotation (radians)
+let pointerLockSettled = false;
 
 
 // FPS Counter
@@ -95,10 +96,12 @@ function updateWalk() {
 
   viewer.camera.position.add(move);
 
-  // Keep the orbit target synced to camera position so the library's
-  // internal controls.update() doesn't pull the camera back to the old target
+  // Keep orbit target 1 unit in front of camera so controls.update()
+  // doesn't pull the camera back toward the old target
   if (move.lengthSq() > 0) {
-    viewer.perspectiveControls.target.add(move);
+    const dir = new THREE.Vector3();
+    viewer.camera.getWorldDirection(dir);
+    viewer.perspectiveControls.target.copy(viewer.camera.position).addScaledVector(dir, 1);
   }
 }
 
@@ -118,7 +121,7 @@ function addKeyframe() {
   previewPathBtn.disabled = keyframes.length < 2;
   exportBtn.disabled = keyframes.length < 2;
   pathStatus.textContent = `${keyframes.length} keyframe(s)`;
-  console.log(`Keyframe ${keyframeCounter} added`);
+
 }
 
 // Rebuild the keyframe list UI with drag-to-reorder and delete buttons
@@ -419,6 +422,7 @@ function toggleWalkMode() {
     // Disable orbit controls so they don't fight the walk camera
     viewer.perspectiveControls.enabled = false;
     // Request pointer lock so mouse movement is captured
+    pointerLockSettled = false;
     document.body.requestPointerLock();
     walkModeBtn.textContent = 'Orbit Mode';
     crosshair.classList.add('show');
@@ -457,7 +461,7 @@ document.addEventListener('keydown', (e) => {
 
 // Mouse look — only fires while pointer is locked
 document.addEventListener('mousemove', (e) => {
-  if (!walkMode || !document.pointerLockElement) return;
+  if (!walkMode || !pointerLockSettled) return;
   yaw   += e.movementX * mouseSensitivity;
   pitch += e.movementY * mouseSensitivity;
   // Clamp pitch so camera can't flip upside down
@@ -474,10 +478,15 @@ document.addEventListener('mousemove', (e) => {
 // Exit walk mode if pointer lock is released (e.g. user presses Escape)
 // Small delay prevents brief lock drops (e.g. alt-tab) from killing walk mode
 document.addEventListener('pointerlockchange', () => {
-  if (!document.pointerLockElement && walkMode) {
-    setTimeout(() => {
-      if (!document.pointerLockElement && walkMode) toggleWalkMode();
-    }, 200);
+  if (document.pointerLockElement) {
+    requestAnimationFrame(() => { pointerLockSettled = true; });
+  } else {
+    pointerLockSettled = false;
+    if (walkMode) {
+      setTimeout(() => {
+        if (!document.pointerLockElement && walkMode) toggleWalkMode();
+      }, 200);
+    }
   }
 });
 
