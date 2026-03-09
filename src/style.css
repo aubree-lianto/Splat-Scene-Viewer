@@ -68,6 +68,61 @@ h1 {
   display: block;
 }
 
+/* WASD HUD — always visible */
+.walk-hud {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: rgba(20, 20, 30, 0.75);
+  color: rgba(255, 255, 255, 0.7);
+  font-family: monospace;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(100, 108, 255, 0.3);
+  pointer-events: none;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.walk-hud-row {
+  display: flex;
+  gap: 3px;
+}
+
+.walk-hud-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: rgba(100, 108, 255, 0.35);
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 700;
+  border-radius: 3px;
+  transition: background 0.05s, color 0.05s;
+}
+
+.walk-hud-key.walk-hud-spacer {
+  background: transparent;
+}
+
+.walk-hud-key.active {
+  background: rgba(100, 108, 255, 0.9);
+  color: #fff;
+}
+
+.walk-hud-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 2px;
+}
+
 /* Loading Progress Bar */
 .loading-container {
   position: fixed;
@@ -203,6 +258,17 @@ h1 {
   color: rgba(255, 255, 255, 0.4);
   font-family: monospace;
   margin-bottom: 4px;
+}
+
+/* Key press toast — reuses walk-hud style, floats above it */
+.key-badge {
+  bottom: 120px;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.key-badge.fade-out {
+  opacity: 0;
 }
 
 .kf-delete-btn {

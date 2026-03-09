@@ -26,6 +26,13 @@ const frameSceneBtn = document.getElementById('frame-scene-btn');
 const resetViewBtn = document.getElementById('reset-view-btn');
 const walkModeBtn = document.getElementById('walk-mode-btn');
 const crosshair = document.getElementById('crosshair');
+const hudMouse = document.getElementById('hud-mouse');
+const hudKeys = {
+  KeyW: document.getElementById('hud-w'),
+  KeyA: document.getElementById('hud-a'),
+  KeyS: document.getElementById('hud-s'),
+  KeyD: document.getElementById('hud-d'),
+};
 const addKeyframeBtn = document.getElementById('add-keyframe-btn');
 const previewPathBtn = document.getElementById('preview-path-btn');
 const clearPathBtn = document.getElementById('clear-path-btn');
@@ -384,6 +391,20 @@ function resetView() {
   }
 }
 
+// Show a key press toast at bottom-center — for demo visibility
+let _activeBadge = null;
+function showKeyBadge(keyLabel, actionLabel) {
+  // Remove any existing toast immediately so rapid presses don't stack
+  if (_activeBadge) { _activeBadge.remove(); _activeBadge = null; }
+  const badge = document.createElement('div');
+  badge.className = 'walk-hud key-badge';
+  badge.innerHTML = `<div class="walk-hud-row"><span class="walk-hud-key active">${keyLabel}</span></div><span class="walk-hud-label">${actionLabel}</span>`;
+  document.body.appendChild(badge);
+  _activeBadge = badge;
+  setTimeout(() => badge.classList.add('fade-out'), 900);
+  setTimeout(() => { badge.remove(); if (_activeBadge === badge) _activeBadge = null; }, 1200);
+}
+
 // Walk mode toggle
 function toggleWalkMode() {
   walkMode = !walkMode;
@@ -401,12 +422,14 @@ function toggleWalkMode() {
     document.body.requestPointerLock();
     walkModeBtn.textContent = 'Orbit Mode';
     crosshair.classList.add('show');
+    hudMouse.style.display = 'inline';
   } else {
     // Re-enable orbit controls
     viewer.perspectiveControls.enabled = true;
     document.exitPointerLock();
     walkModeBtn.textContent = 'Walk Mode';
     crosshair.classList.remove('show');
+    hudMouse.style.display = 'none';
   }
 }
 
@@ -417,13 +440,18 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
   }
   keys[e.code] = true;
+  if (hudKeys[e.code]) hudKeys[e.code].classList.add('active');
 });
-document.addEventListener('keyup',   (e) => { keys[e.code] = false; });
+document.addEventListener('keyup', (e) => {
+  keys[e.code] = false;
+  if (hudKeys[e.code]) hudKeys[e.code].classList.remove('active');
+});
 
-// Tab key toggles walk mode; K adds a keyframe; block C so the library's mesh cursor stays off
+// Tab key toggles walk mode; K adds a keyframe; P previews; block C so the library's mesh cursor stays off
 document.addEventListener('keydown', (e) => {
-  if (e.code === 'Tab') { e.preventDefault(); toggleWalkMode(); }
-  if (e.code === 'KeyK') { e.preventDefault(); addKeyframe(); }
+  if (e.code === 'Tab') { e.preventDefault(); toggleWalkMode(); showKeyBadge('Tab', 'Walk Mode'); }
+  if (e.code === 'KeyK') { e.preventDefault(); addKeyframe(); showKeyBadge('K', 'Add Keyframe'); }
+  if (e.code === 'KeyP') { e.preventDefault(); startPreview(); showKeyBadge('P', 'Preview Path'); }
   if (e.code === 'KeyC') { e.stopImmediatePropagation(); }
 });
 
