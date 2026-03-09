@@ -7,8 +7,12 @@ A web-based 3D Gaussian Splats viewer with interactive camera controls, animated
 - **Orbit & Walk modes** — switch between free-orbit camera and first-person WASD walk with mouse look
 - **Camera path recording** — add keyframes, reorder by dragging, preview smooth spline animation
 - **MP4 export** — render the camera path to video via a local FFmpeg server
-- **Color grading** — exposure and contrast sliders applied per-pixel during export
-- **Save / load paths** — camera path + render settings saved to `path.json` for deterministic re-export
+
+### Extras
+
+- **Color grading** — exposure and contrast sliders apply per-pixel during export, matching the live viewport
+- **Safe cancel** — cancelling mid-export restores the renderer to its original state without corrupting output
+- **Save / load paths** — camera path, render settings, and color grading saved to `path.json`; reloading produces a bit-identical export
 
 ## Prerequisites
 
