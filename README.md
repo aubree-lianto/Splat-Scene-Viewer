@@ -47,7 +47,6 @@ npm run server  # Export server only
 |-----|--------|
 | `Tab` | Toggle Walk / Orbit mode |
 | `K` | Add keyframe at current camera position |
-| `P` | Play / stop camera path preview |
 | `W A S D` | Move in Walk mode |
 | `Mouse` | Look around (Walk mode) / orbit (Orbit mode) |
 | `Esc` | Exit Walk mode |
