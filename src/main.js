@@ -55,6 +55,7 @@ const addKeyframeBtn = document.getElementById('add-keyframe-btn');
 const previewPathBtn = document.getElementById('preview-path-btn');
 const clearPathBtn = document.getElementById('clear-path-btn');
 const exportBtn = document.getElementById('export-btn');
+const exportBgBtn = document.getElementById('export-bg-btn');
 const exportProgress = document.getElementById('export-progress');
 const exportBar = document.getElementById('export-bar');
 const exportText = document.getElementById('export-text');
@@ -147,6 +148,7 @@ function addKeyframe() {
   updateKeyframeList();
   previewPathBtn.disabled = keyframes.length < 2;
   exportBtn.disabled = keyframes.length < 2;
+  exportBgBtn.disabled = keyframes.length < 2;
   pathStatus.textContent = `${keyframes.length} keyframe(s)`;
 
 }
@@ -211,6 +213,7 @@ function updateKeyframeList() {
       updateKeyframeList();
       previewPathBtn.disabled = keyframes.length < 2;
       exportBtn.disabled = keyframes.length < 2;
+      exportBgBtn.disabled = keyframes.length < 2;
       pathStatus.textContent = keyframes.length ? `${keyframes.length} keyframe(s)` : '';
     });
     keyframeList.appendChild(item);
@@ -540,6 +543,7 @@ if (clearPathBtn) clearPathBtn.addEventListener('click', () => {
   updateKeyframeList();
   previewPathBtn.disabled = true;
   exportBtn.disabled = true;
+  exportBgBtn.disabled = true;
   pathStatus.textContent = '';
 });
 
@@ -573,6 +577,52 @@ if (exportBtn) exportBtn.addEventListener('click', () => {
   exportBar.style.width = '0%';
   cancelExportBtn.onclick = () => exporter.cancel();
   exporter.export();
+});
+
+if (exportBgBtn) exportBgBtn.addEventListener('click', () => {
+  const [resW, resH] = resSelect.value.split('x').map(Number);
+
+  // Serialize keyframes to plain JSON — THREE objects can't cross the BroadcastChannel
+  const config = {
+    keyframes: keyframes.map(kf => ({
+      id:         kf.id,
+      position:   kf.position.toArray(),
+      quaternion: [kf.quaternion.x, kf.quaternion.y, kf.quaternion.z, kf.quaternion.w],
+      fov:        kf.fov,
+    })),
+    splatUrl:  splatUrl,
+    cameraUp:  [0, -1, 0],
+    duration:  playbackDuration,
+    fps:       Number(fpsSelect.value),
+    width:     resW,
+    height:    resH,
+    exposure:  Number(exposureSlider.value),
+    contrast:  Number(contrastSlider.value),
+  };
+
+  const channel = new BroadcastChannel('splat-export');
+
+  // Open the export window. Because COOP: same-origin severs the opener
+  // reference, we can't call popup.postMessage() — use BroadcastChannel instead.
+  window.open('/export.html', '_blank');
+
+  // Wait for the worker page to signal it's ready, then send the config once.
+  const onMessage = (e) => {
+    if (e.data?.type === 'worker-ready') {
+      channel.removeEventListener('message', onMessage);
+      channel.postMessage({ type: 'start-export', config });
+      pathStatus.textContent = 'Export running in background window…';
+    }
+    if (e.data?.type === 'export-complete') {
+      pathStatus.textContent = 'Background export complete!';
+      channel.close();
+    }
+    if (e.data?.type === 'export-error') {
+      pathStatus.textContent = `Background export error: ${e.data.error}`;
+      channel.close();
+    }
+  };
+  channel.addEventListener('message', onMessage);
 });
 
 // Color grading — all via CSS filter on the canvas so it works with the splat renderer
@@ -649,6 +699,7 @@ loadPathInput.addEventListener('change', (e) => {
       updateKeyframeList();
       previewPathBtn.disabled = keyframes.length < 2;
       exportBtn.disabled = keyframes.length < 2;
+      exportBgBtn.disabled = keyframes.length < 2;
       pathStatus.textContent = `Loaded ${keyframes.length} keyframe(s)`;
     } catch { alert('Invalid path.json'); }
     loadPathInput.value = '';

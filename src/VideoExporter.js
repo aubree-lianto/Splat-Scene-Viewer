@@ -30,8 +30,8 @@ export class VideoExporter {
     const totalFrames = this.fps * this.duration;
 
     try {
-      // Tell server to prepare and clear old frames
-      await this._post('/api/export/start', {
+      // Tell server to prepare a new session — receives back a unique sessionId
+      const { sessionId } = await this._post('/api/export/start', {
         width: this.width,
         height: this.height,
         fps: this.fps,
@@ -80,7 +80,7 @@ export class VideoExporter {
           const imageData = this._captureFrame(renderer.domElement);
 
           // Fire POST without awaiting so it overlaps with the next frame's sort
-          pendingPost = this._post('/api/export/frame', { frameIndex: i, imageData });
+          pendingPost = this._post('/api/export/frame', { sessionId, frameIndex: i, imageData });
 
           this.onProgress((i + 1) / totalFrames, `Rendering frame ${i + 1} / ${totalFrames}`);
         }
@@ -91,13 +91,14 @@ export class VideoExporter {
         // Tell server to run FFmpeg
         this.onProgress(1, 'Encoding video...');
         await this._post('/api/export/encode', {
+          sessionId,
           fps: this.fps,
           width: this.width,
           height: this.height,
         });
 
-        // Trigger browser download
-        this._triggerDownload();
+        // Trigger browser download — server returns the session-scoped URL
+        this._triggerDownload(`${this.serverUrl}/api/export/download?session=${sessionId}`);
         this.onComplete();
 
       } finally {
@@ -207,9 +208,9 @@ export class VideoExporter {
     return res.json();
   }
 
-  _triggerDownload() {
+  _triggerDownload(url) {
     const a = document.createElement('a');
-    a.href = `${this.serverUrl}/api/export/download`;
+    a.href = url;
     a.download = 'output.mp4';
     document.body.appendChild(a);
     a.click();

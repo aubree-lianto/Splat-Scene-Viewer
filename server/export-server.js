@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
+import { randomUUID } from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -14,40 +15,39 @@ app.use(express.json({ limit: '50mb' }));
 const FRAMES_DIR = path.join(__dirname, 'frames');
 const OUTPUT_DIR = path.join(__dirname, 'output');
 
-// Ensure directories exist on startup
+// Ensure base directories exist on startup
 [FRAMES_DIR, OUTPUT_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
-// Start a new export session — clears any old frames
+// Start a new export session — returns a sessionId used by all subsequent calls.
+// Each session gets its own subdirectory so concurrent exports don't collide.
 app.post('/api/export/start', (req, res) => {
   const { width, height, fps, totalFrames } = req.body;
-  console.log(`Export session started: ${width}x${height} @ ${fps}fps, ${totalFrames} frames`);
+  const sessionId = randomUUID();
+  const sessionDir = path.join(FRAMES_DIR, sessionId);
 
-  // Delete all existing frames
-  if (fs.existsSync(FRAMES_DIR)) {
-    fs.readdirSync(FRAMES_DIR).forEach(file => {
-      fs.unlinkSync(path.join(FRAMES_DIR, file));
-    });
-  }
+  fs.mkdirSync(sessionDir, { recursive: true });
 
-  res.json({ success: true });
+  console.log(`Export session ${sessionId} started: ${width}x${height} @ ${fps}fps, ${totalFrames} frames`);
+  res.json({ success: true, sessionId });
 });
 
 // Receive a single frame as base64 JPEG (or PNG) and save to disk
 app.post('/api/export/frame', (req, res) => {
-  const { frameIndex, imageData } = req.body;
+  const { sessionId, frameIndex, imageData } = req.body;
+  const sessionDir = path.join(FRAMES_DIR, sessionId);
 
   const isJpeg = imageData.startsWith('data:image/jpeg');
   const base64Data = imageData.replace(/^data:image\/(jpeg|png);base64,/, '');
   const ext = isJpeg ? 'jpg' : 'png';
   const filename = `frame_${String(frameIndex).padStart(6, '0')}.${ext}`;
-  const filepath = path.join(FRAMES_DIR, filename);
+  const filepath = path.join(sessionDir, filename);
 
   fs.writeFileSync(filepath, base64Data, 'base64');
 
   if (frameIndex % 30 === 0) {
-    console.log(`Saved frame ${frameIndex}: ${filename}`);
+    console.log(`[${sessionId.slice(0, 8)}] Saved frame ${frameIndex}: ${filename}`);
   }
 
   res.json({ success: true, frameIndex });
@@ -55,20 +55,16 @@ app.post('/api/export/frame', (req, res) => {
 
 // Encode saved frames to MP4 using FFmpeg
 app.post('/api/export/encode', (req, res) => {
-  const { fps = 30, width = 1280, height = 720 } = req.body;
-  const outputPath = path.join(OUTPUT_DIR, 'output.mp4');
+  const { sessionId, fps = 30, width = 1280, height = 720 } = req.body;
+  const sessionDir = path.join(FRAMES_DIR, sessionId);
+  const outputPath = path.join(OUTPUT_DIR, `${sessionId}.mp4`);
 
-  console.log(`Starting FFmpeg encode: ${width}x${height} @ ${fps}fps`);
-
-  // Remove existing output file if present
-  if (fs.existsSync(outputPath)) {
-    fs.unlinkSync(outputPath);
-  }
+  console.log(`[${sessionId.slice(0, 8)}] Starting FFmpeg encode: ${width}x${height} @ ${fps}fps`);
 
   const ffmpeg = spawn('C:\\ffmpeg\\bin\\ffmpeg.exe', [
     '-y',
     '-framerate', String(fps),
-    '-i', path.join(FRAMES_DIR, 'frame_%06d.jpg'),
+    '-i', path.join(sessionDir, 'frame_%06d.jpg'),
     '-c:v', 'libx264',
     '-pix_fmt', 'yuv420p',
     '-preset', 'medium',
@@ -98,10 +94,12 @@ app.post('/api/export/encode', (req, res) => {
 
   ffmpeg.on('close', code => {
     if (code === 0) {
-      console.log('FFmpeg encode complete:', outputPath);
-      respond(200, { success: true, downloadUrl: '/api/export/download' });
+      console.log(`[${sessionId.slice(0, 8)}] Encode complete:`, outputPath);
+      // Clean up session frames now that encoding is done
+      fs.rmSync(sessionDir, { recursive: true, force: true });
+      respond(200, { success: true, downloadUrl: `/api/export/download?session=${sessionId}` });
     } else {
-      console.error('FFmpeg failed:\n', stderr);
+      console.error(`[${sessionId.slice(0, 8)}] FFmpeg failed:\n`, stderr);
       respond(500, { success: false, error: stderr });
     }
   });
@@ -109,9 +107,10 @@ app.post('/api/export/encode', (req, res) => {
 
 // Serve the finished MP4 for browser download
 app.get('/api/export/download', (req, res) => {
-  const outputPath = path.join(OUTPUT_DIR, 'output.mp4');
+  const { session } = req.query;
+  const outputPath = path.join(OUTPUT_DIR, `${session}.mp4`);
 
-  if (fs.existsSync(outputPath)) {
+  if (session && fs.existsSync(outputPath)) {
     res.download(outputPath, 'output.mp4');
   } else {
     res.status(404).json({ error: 'No video found. Run an export first.' });

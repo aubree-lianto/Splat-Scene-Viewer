@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Splat Export Worker</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        background: #111;
+        color: #e0e0e0;
+        font-family: monospace;
+        font-size: 13px;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        padding: 20px;
+        gap: 16px;
+      }
+
+      h1 {
+        font-size: 16px;
+        font-weight: 600;
+        color: #fff;
+        letter-spacing: 0.05em;
+      }
+
+      #status {
+        color: #aaa;
+        min-height: 1.4em;
+      }
+
+      .progress-bg {
+        background: #2a2a2a;
+        border-radius: 4px;
+        height: 8px;
+        overflow: hidden;
+      }
+
+      #progress-fill {
+        height: 100%;
+        width: 0%;
+        background: #4f8ef7;
+        border-radius: 4px;
+        transition: width 0.2s ease;
+      }
+
+      #log {
+        flex: 1;
+        background: #1a1a1a;
+        border: 1px solid #2a2a2a;
+        border-radius: 4px;
+        padding: 10px;
+        overflow-y: auto;
+        line-height: 1.6;
+        color: #888;
+      }
+
+      #log div:last-child { color: #ccc; }
+
+      /* The canvas is hidden — it only exists to give Three.js a WebGL context.
+       It must be in the DOM and have explicit dimensions so the WebGL context
+       initialises with a valid viewport rather than a 0×0 surface. */
+      #render-canvas {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+        width: 1280px;
+        height: 720px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Splat Export Worker</h1>
+    <div id="status">Initializing…</div>
+    <div class="progress-bg"><div id="progress-fill"></div></div>
+    <div id="log"></div>
+
+    <!-- Off-screen canvas used by the GaussianSplats3D renderer.
+         Positioned off-screen rather than display:none so the WebGL context
+         gets a valid viewport size. -->
+    <canvas id="render-canvas"></canvas>
+
+    <script type="module" src="/src/ExportWorker.js"></script>
+  </body>
+</html>

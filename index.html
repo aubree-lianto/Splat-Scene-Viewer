@@ -78,6 +78,10 @@
           <input id="contrast-slider" type="range" min="0" max="2" step="0.05" value="1" class="path-color-slider">
           <span id="contrast-val" class="path-color-val">1.00</span>
         </label>
+         <label class="path-setting-label" style="width:100%;">Hue
+          <input id="hue-slider" type="range" min="0" max="2" step="0.05" value="1" class="path-color-slider">
+          <span id="hue-val" class="path-color-val">1.00</span>
+        </label>
       </div>
       <!-- Save / Load path -->
       <div class="path-buttons" style="margin-bottom:4px;">
@@ -90,6 +94,7 @@
         <button id="preview-path-btn" disabled>Preview</button>
         <button id="clear-path-btn">Clear</button>
         <button id="export-btn" disabled>Export MP4</button>
+        <button id="export-bg-btn" disabled>Export (BG)</button>
       </div>
       <div id="export-progress" class="export-progress" style="display:none;">
         <div class="export-bar-bg"><div id="export-bar" class="export-bar"></div></div>
